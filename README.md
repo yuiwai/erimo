@@ -7,7 +7,7 @@ Erimoは、Akka Persistenceを利用して状態を永続化するシンプル�
 `build.sbt` に依存性を追加します
 
 ```
-resolver += "yuiwai repo" at "https://s3-us-west-2.amazonaws.com/repo.yuiwai.com"
+resolvers += "yuiwai repo" at "https://s3-us-west-2.amazonaws.com/repo.yuiwai.com"
 libraryDependencies += "com.yuiwai" %% "erimo-core" % "0.1.0"
 ```
 
@@ -20,6 +20,8 @@ akka.persistence.snapshot-store.plugin = "akka.persistence.snapshot-store.local"
 ```
 
 コード例です
+
+即時、1秒後、3秒後の3つのスケジュールを予約し、 `onSchedule` で受け取って、メッセージを出力しています
 
 ```scala
 import java.time.Instant
@@ -35,7 +37,7 @@ object Main extends App with Scheduler {
   override def onSchedule(payload: String): Unit = {
     println(s"on schedule: payload=$payload")
   }
-  val system = ActorSystem()
+  override val system = ActorSystem()
 
   schedule(Instant.now(), "test now")
   schedule(1.second, "test 1sec")
