@@ -7,7 +7,8 @@ lazy val core = (project in file("core"))
   .settings(
     name := "erimo-core",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-persistence" % "2.5.9"
+      "com.typesafe.akka" %% "akka-persistence" % "2.5.9",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.9"
     ),
     publishTo := Some(Resolver.file("file", file("release")))
   )
