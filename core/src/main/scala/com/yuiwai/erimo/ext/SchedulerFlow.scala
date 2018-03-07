@@ -2,17 +2,11 @@ package com.yuiwai.erimo.ext
 
 import java.time.Instant
 
-import akka.stream.stage.{GraphStage, GraphStageLogic}
-import akka.stream._
+import akka.stream.scaladsl.{Flow, Source}
 
 object SchedulerFlow {
+  def apply[Payload](schedulerId: String) = Flow.fromSinkAndSource(sender(schedulerId), receiver)
+  private def sender[Payload](schedulerId: String) = Flow[(Instant, Payload)].to()
+  private def receiver =  Source.empty
 }
 
-class SchedulerFlowGraphStage[Payload](scheduleId: String) extends GraphStage[SourceShape[Payload]] {
-  val in: Inlet[(Instant, Payload)] = Inlet("SchedulerFlowGraphStageIn")
-  val out: Outlet[Payload] = Outlet("SchedulerFlowGraphStageOut")
-  val shape = FlowShape(in, out)
-  override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
-
-  }
-}

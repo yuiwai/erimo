@@ -12,3 +12,6 @@ lazy val core = (project in file("core"))
     ),
     publishTo := Some(Resolver.file("file", file("release")))
   )
+
+lazy val example = (project in file("example"))
+  .dependsOn(core)
