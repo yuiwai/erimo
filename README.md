@@ -8,7 +8,7 @@ Erimoは、Akka Persistenceを利用して状態を永続化するシンプル�
 
 ```
 resolvers += "yuiwai repo" at "https://s3-us-west-2.amazonaws.com/repo.yuiwai.com"
-libraryDependencies += "com.yuiwai" %% "erimo-core" % "0.1.0"
+libraryDependencies += "com.yuiwai" %% "erimo-core" % "0.2.0"
 ```
 
 `application.conf` に、 `akka-persistence` の設定を追加します  
@@ -31,8 +31,7 @@ import com.yuiwai.erimo.Scheduler
 
 import scala.concurrent.duration._
 
-object Main extends App with Scheduler {
-  override type Payload = String
+object Main extends App with Scheduler[String] {
   override val schedulerId: String = "test"
   override def onSchedule(payload: String): Unit = {
     println(s"on schedule: payload=$payload")

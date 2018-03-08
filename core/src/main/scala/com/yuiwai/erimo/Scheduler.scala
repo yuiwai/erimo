@@ -8,9 +8,8 @@ import akka.persistence.{PersistentActor, SnapshotOffer}
 import scala.collection.SortedSet
 import scala.concurrent.duration.Duration
 
-trait Scheduler {
+trait Scheduler[Payload] {
   import SchedulerActor._
-  type Payload
   val schedulerId: String
   protected val system: ActorSystem
   private lazy val scheduleActor: ActorRef = system.actorOf(SchedulerActor.props(schedulerId, onSchedule))
@@ -40,7 +39,6 @@ private[erimo] class SchedulerActor[P](schedulerId: String, callback: P => Unit)
   override def persistenceId: String = schedulerId
   override def preStart(): Unit = {
     import context.dispatcher
-
     import scala.concurrent.duration._
     super.preStart()
     context.system.scheduler.schedule(0.second, 1.second, self, TickCommand)
