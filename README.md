@@ -31,7 +31,7 @@ import com.yuiwai.erimo.Scheduler
 
 import scala.concurrent.duration._
 
-object Main extends App with Scheduler[String] {
+object Example extends App with Scheduler[String] {
   override val schedulerId: String = "test"
   override def onSchedule(payload: String): Unit = {
     println(s"on schedule: payload=$payload")
@@ -43,3 +43,29 @@ object Main extends App with Scheduler[String] {
   schedule(3.second, "test 3sec")
 }
 ```
+
+### Stream版
+
+`ScheduleFlow` を利用すると、akka-streamのFlowとしてSchedulerを利用出来ます。
+
+```scala
+package com.yuiwai.erimo.example
+import java.time.Instant
+
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{Sink, Source}
+import com.yuiwai.erimo.ext.SchedulerFlow
+
+object Example extends App {
+  implicit val system = ActorSystem()
+  implicit val materializer = ActorMaterializer()
+
+  def instant(sec: Int) = Instant.now().plusSeconds(sec)
+  def schedule(sec: Int): (Instant, String) = (instant(sec), s"$sec seconds")
+  Source(schedule(3) :: schedule(5) :: schedule(10) :: Nil)
+    .via(SchedulerFlow[String]("my-schedule"))
+    .runWith(Sink.foreach(println))
+}
+```
+
