@@ -3,62 +3,29 @@ package com.yuiwai.erimo.ext
 import java.time.Instant
 
 import akka.actor.ActorSystem
-import akka.stream._
-import akka.stream.scaladsl.{Flow, Keep}
-import akka.stream.stage._
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.stream.{KillSwitches, OverflowStrategy, UniqueKillSwitch}
 import com.yuiwai.erimo.Scheduler
 
-import scala.collection.mutable
-import scala.concurrent.duration._
+import scala.reflect.ClassTag
 
 object SchedulerFlow {
-  def apply[Payload](schedulerId: String)(implicit system: ActorSystem): Flow[(Instant, Payload), Payload, KillSwitch] =
-    Flow.fromGraph(new SchedulerFlowGraphStage[Payload](system, schedulerId)).viaMat(KillSwitches.single)(Keep.right)
-}
-
-class SchedulerFlowGraphStage[Payload](system: ActorSystem, schedulerId: String) extends GraphStage[FlowShape[(Instant, Payload), Payload]] {
-  private val sid = schedulerId
-  private val stm = system
-  val period = 1.second
-  val in: Inlet[(Instant, Payload)] = Inlet[(Instant, Payload)]("SchedulerFlowGraphStage.in")
-  val out: Outlet[Payload] = Outlet[Payload]("SchedulerFlowGraphStage.out")
-  override def shape: FlowShape[(Instant, Payload), Payload] = FlowShape.of(in, out)
-  override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new TimerGraphStageLogic(shape) {
-    private var downstreamWaiting = false
-    private val scheduleQueue: mutable.Queue[Payload] = mutable.Queue.empty
-    private val myScheduler = new Scheduler[Payload] {
-      override val schedulerId: String = sid
-      override protected val system: ActorSystem = stm
-      override def onSchedule(payload: Payload): Unit = scheduleQueue.enqueue(payload)
-    }
-    override def preStart(): Unit = {
-      schedulePeriodically(None, period)
-    }
-    setHandler(in, new InHandler {
-      override def onPush(): Unit = {
-        val elem = grab(in)
-        myScheduler.schedule(elem._1, elem._2)
-        pull(in)
-      }
-    })
-    setHandler(out, new OutHandler {
-      override def onPull(): Unit = {
-        if (scheduleQueue.nonEmpty) {
-          push(out, scheduleQueue.dequeue())
-          downstreamWaiting = false
-        } else {
-          downstreamWaiting = true
-        }
-        if (!hasBeenPulled(in)) pull(in)
-      }
-    })
-    override protected def onTimer(timerKey: Any): Unit = {
-      println((downstreamWaiting, scheduleQueue))
-      if (scheduleQueue.nonEmpty && downstreamWaiting) {
-        push(out, scheduleQueue.dequeue())
-        downstreamWaiting = false
+  case class Message[Payload](scheduleId: String, payload: Payload)
+  def apply[Payload: ClassTag](id: String)(implicit actorSystem: ActorSystem): Flow[(Instant, Payload), Payload, UniqueKillSwitch] = {
+    val scheduler = new Scheduler[Payload] {
+      override val schedulerId: String = id
+      override protected val system: ActorSystem = actorSystem
+      override def onSchedule(payload: Payload): Unit = {
+        system.eventStream.publish(Message(schedulerId, payload))
       }
     }
+    val source = Source.actorRef[Payload](16, OverflowStrategy.dropHead)
+      .collect {
+        case Message(`id`, payload: Payload) => payload
+      }
+      .mapMaterializedValue(actorSystem.eventStream.subscribe(_, classOf[Message[Payload]]))
+    val sink = Sink.foreach[(Instant, Payload)](s => scheduler.schedule(s._1, s._2))
+    Flow.fromSinkAndSource(sink, source).joinMat(KillSwitches.singleBidi[Payload, (Instant, Payload)])(Keep.right)
   }
 }
 
